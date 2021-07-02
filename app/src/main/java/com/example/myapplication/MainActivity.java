@@ -1,5 +1,6 @@
 package com.example.myapplication;
 
+import android.app.AlertDialog;
 import android.content.pm.ActivityInfo;
 import android.graphics.PointF;
 import android.os.AsyncTask;
@@ -62,6 +63,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private FusedLocationSource locationSource;
 
     private NaverAddrApi naverAddrApi;
+    private InfoWindow infoWindow = new InfoWindow();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,10 +108,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onMapReady(@NonNull @NotNull NaverMap naverMap) {
-        Log.d("myLog", "onMapReady 실행");
         this.mNaverMap = naverMap;
+        Log.d("myLog", "onMapReady 실행");
+
         PolygonOverlay nPolygon = new PolygonOverlay();
-        InfoWindow infoWindow = new InfoWindow();
 
         //내 위치
         naverMap.setLocationSource(locationSource);
@@ -117,6 +119,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         LocationOverlay locationOverlay = naverMap.getLocationOverlay();
         locationOverlay.setVisible(true);
+
+        //세 지점 마커, 폴리곤 표시
+        OnMapMP();
 
         //스피너
         Log.d("myLog", "spinner 실행");
@@ -215,17 +220,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             }
         });
-
-        //정보창 내용 띄우기
-        infoWindow.setAdapter(new InfoWindow.DefaultTextAdapter(getApplicationContext()) {
-            @NonNull
-            @Override
-            public CharSequence getText(@NonNull InfoWindow infoWindow) {
-                return null; //strNum;
-            }
-        });
-
-        OnMapMP(); //세 지점 마커, 폴리곤 표시
     }
 
     //세 지점 마커, 폴리곤 표시
@@ -253,14 +247,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         polygon.setMap(mNaverMap);
     }
 
-    private static class NaverAddrApi extends AsyncTask<LatLng, String, String> {
-        private OnDownloadCallback myCallback;
+    private class NaverAddrApi extends AsyncTask<LatLng, String, String> {
         String clientId = "fxcf963wbv";
         String clientSecret = "ufdFQhxxA073iiYX0dSmaN9cAzh3e8e3Z2y7dOKO";
-
-        public interface OnDownloadCallback {
-            void onDownlaodedPnu(String pnu);
-        }
 
         @Override
         protected String doInBackground(LatLng... latLngs) {
@@ -279,7 +268,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 conn.setRequestProperty("X-NCP-APIGW-API-KEY-ID", clientId);
                 conn.setRequestProperty("X-NCP-APIGW-API-KEY", clientSecret);
 
-                // request 코드가 200이면 정상적으로 호출된다고 나와있다.
+                // request 코드가 200이면 정상적으로 호출
                 int responseCode = conn.getResponseCode();
                 Log.d("Json", "response code:" + responseCode);
 
@@ -287,7 +276,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 if (responseCode == 200) { // 정상 호출
                     Log.d("Json", "getPointFromNaver: 정상호출");
-                    //정상적으로 호출이 되면 읽어온다.
                     br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
 
                 } else { // 에러 발생
@@ -312,11 +300,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         protected void onPostExecute(String jsonStr) {
             super.onPostExecute(jsonStr);
             String pnu = getPnu(jsonStr);
-            if (myCallback != null) {
-                if (pnu != null) {
-                    myCallback.onDownlaodedPnu(pnu);
-                }
+
+            infoWindow.setAdapter(new InfoWindow.DefaultTextAdapter(getApplicationContext()) {
+            @NonNull
+            @Override
+            public CharSequence getText(@NonNull InfoWindow infoWindow) {
+                return pnu;
             }
+        });
         }
 
         private String getPnu(String jsonStr) {
@@ -325,30 +316,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             JsonObject jsonObj = (JsonObject) jsonParser.parse(jsonStr);
             JsonArray jsonArray = (JsonArray) jsonObj.get("results");
             jsonObj = (JsonObject) jsonArray.get(0);
-            jsonObj = (JsonObject) jsonObj.get("code");
-            String pnu = jsonObj.get("id").getAsString();
+            jsonObj = (JsonObject) jsonObj.get("region");
+            jsonObj = (JsonObject) jsonObj.get("area1");
+            String pnu = jsonObj.get("name").getAsString() + " ";
 
-            jsonObj = (JsonObject) jsonParser.parse(jsonStr);
-            jsonArray = (JsonArray) jsonObj.get("results");
+            jsonObj = (JsonObject) jsonArray.get(0);
+            jsonObj = (JsonObject) jsonObj.get("region");
+            jsonObj = (JsonObject) jsonObj.get("area2");
+            pnu += jsonObj.get("name").getAsString() + " ";
+
+            jsonObj = (JsonObject) jsonArray.get(0);
+            jsonObj = (JsonObject) jsonObj.get("region");
+            jsonObj = (JsonObject) jsonObj.get("area3");
+            pnu += jsonObj.get("name").getAsString() + " ";
+
             jsonObj = (JsonObject) jsonArray.get(0);
             jsonObj = (JsonObject) jsonObj.get("land");
-            pnu = pnu + jsonObj.get("type").getAsString();
-            String number1 = jsonObj.get("number1").getAsString();
-            String number2 = jsonObj.get("number2").getAsString();
-            pnu = pnu + makeStringNum(number1) + makeStringNum(number2);
+            pnu += jsonObj.get("number1").getAsString();
 
-            Log.d("JsonTest", "실행 " + jsonParser.parse(jsonStr));
-
+            Log.d("JsonTest", "Json result: " + pnu);
             return pnu;
-        }
-
-        private String makeStringNum(String number) {
-            String strNum = "";
-            for (int i = 0; i < 4 - number.length(); i++) {
-                strNum = strNum + "0";
-            }
-            strNum = strNum + number;
-            return strNum;
         }
     }
 }
