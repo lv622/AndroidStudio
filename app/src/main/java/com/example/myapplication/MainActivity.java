@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private ArrayList<Marker> markerLongArr = new ArrayList<>();
     private ArrayList<LatLng> latLngLongArr = new ArrayList<>();
+    private PolygonOverlay nPolygon = new PolygonOverlay();
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
     private FusedLocationSource locationSource;
@@ -111,115 +112,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         this.mNaverMap = naverMap;
         Log.d("myLog", "onMapReady 실행");
 
-        PolygonOverlay nPolygon = new PolygonOverlay();
-
-        //내 위치
+        //내 위치 표시
         naverMap.setLocationSource(locationSource);
         naverMap.setLocationTrackingMode(LocationTrackingMode.Follow);
 
         LocationOverlay locationOverlay = naverMap.getLocationOverlay();
         locationOverlay.setVisible(true);
 
-        //세 지점 마커, 폴리곤 표시
-        OnMapMP();
-
-        //스피너
-        Log.d("myLog", "spinner 실행");
-        mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position == 0) naverMap.setMapType(NaverMap.MapType.Basic);
-                else naverMap.setMapType(NaverMap.MapType.Hybrid);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-
-        //체크박스
-        Log.d("myLog", "checkBox 실행");
-        mLayerGroup.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mLayerGroup.isChecked()) {
-                    naverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, true);
-                } else {
-                    naverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, false);
-                }
-            }
-        });
-
-        //위경도 좌표 표시, 마커 생성
-        Log.d("myLog", "위경도 좌표 표시, 새 마커 생성");
-        mNaverMap.setOnMapClickListener(new NaverMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(@NonNull @NotNull PointF pointF, @NonNull @NotNull LatLng latLng) {
-                Toast.makeText(getApplicationContext(), "위도: " + latLng.latitude + ", 경도: " + latLng.longitude, Toast.LENGTH_SHORT).show();
-
-                markerArr.add(new Marker(new LatLng(latLng.latitude, latLng.longitude)));
-                latLngArr.add(new LatLng(latLng.latitude, latLng.longitude));
-
-                for (int i = 0; i < markerArr.size(); i++) {
-                    markerArr.get(i).setMap(naverMap);
-                }
-
-                if (markerArr.size() > 2) {
-                    nPolygon.setCoords(latLngArr);
-
-                    nPolygon.setColor(0x7f00ff00);
-                    nPolygon.setMap(naverMap);
-                }
-            }
-        });
-
-        //전체 오버레이 삭제
-        mButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Log.d("myLog", "전체 오버레이 삭제");
-                for (int i = 0; i < markerArr.size(); i++) {
-                    markerArr.get(i).setMap(null);
-                }
-                markerArr.clear();
-                latLngArr.clear();
-                nPolygon.setMap(null);
-
-                for (int i = 0; i < markerLongArr.size(); i++) {
-                    markerLongArr.get(i).setMap(null);
-                }
-                markerLongArr.clear();
-                latLngLongArr.clear();
-            }
-        });
-
-        //카메라 이동
-        mCamera.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Log.d("myLog", "카메라 이동");
-                CameraUpdate cameraUpdate = CameraUpdate.scrollAndZoomTo(new LatLng(35.960259, 126.682631), 11).animate(CameraAnimation.Easing, 500);
-                mNaverMap.moveCamera(cameraUpdate);
-            }
-        });
-
-        //롱-클릭 마커 생성 후 정보창
-        mNaverMap.setOnMapLongClickListener(new NaverMap.OnMapLongClickListener() {
-            @Override
-            public void onMapLongClick(@NonNull @NotNull PointF pointF, @NonNull @NotNull LatLng latLng) {
-                //Toast.makeText(getApplicationContext(), "위도: " + latLng.latitude + ", 경도: " + latLng.longitude, Toast.LENGTH_SHORT).show();
-                markerLongArr.add(new Marker(new LatLng(latLng.latitude, latLng.longitude)));
-                latLngLongArr.add(new LatLng(latLng.latitude, latLng.longitude));
-
-                for (int i = 0; i < markerLongArr.size(); i++) {
-                    naverAddrApi = new NaverAddrApi();
-                    naverAddrApi.execute(latLngLongArr.get(i));
-
-                    markerLongArr.get(i).setMap(naverMap);
-                    infoWindow.open(markerLongArr.get(i));
-                }
-            }
-        });
+        OnMapMP(); //세 지점 마커, 폴리곤 표시
+        onMapSpinner(); //스피너로 지도 유형 변경
+        onMapCheckBox(); //체크박스 지적편집도 표시
+        onMapLatLngMarker(); //위경도 마커 표시
+        onMapRemoveOverlay(); //전체 오버레이 삭제
+        onMapMoveCamera(); //카메라 좌표 이동
+        onMapLongClickMarker(); //롱-클릭 마커 생성 후 정보창 표시
     }
 
     //세 지점 마커, 폴리곤 표시
@@ -247,6 +153,117 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         polygon.setMap(mNaverMap);
     }
 
+    //스피너 지도 유형 변경
+    public void onMapSpinner(){
+        Log.d("myLog", "spinner 실행");
+        mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position == 0) mNaverMap.setMapType(NaverMap.MapType.Basic);
+                else mNaverMap.setMapType(NaverMap.MapType.Hybrid);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    //체크박스 지적편집도 표시
+    public void onMapCheckBox(){
+        Log.d("myLog", "checkBox 실행");
+        mLayerGroup.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mLayerGroup.isChecked()) {
+                    mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, true);
+                } else {
+                    mNaverMap.setLayerGroupEnabled(NaverMap.LAYER_GROUP_CADASTRAL, false);
+                }
+            }
+        });
+    }
+
+    //위경도 마커 표시
+    public void onMapLatLngMarker(){
+        Log.d("myLog", "위경도 좌표 표시, 새 마커 생성");
+        mNaverMap.setOnMapClickListener(new NaverMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(@NonNull @NotNull PointF pointF, @NonNull @NotNull LatLng latLng) {
+                Toast.makeText(getApplicationContext(), "위도: " + latLng.latitude + ", 경도: " + latLng.longitude, Toast.LENGTH_SHORT).show();
+
+                markerArr.add(new Marker(new LatLng(latLng.latitude, latLng.longitude)));
+                latLngArr.add(new LatLng(latLng.latitude, latLng.longitude));
+
+                for (int i = 0; i < markerArr.size(); i++) {
+                    markerArr.get(i).setMap(mNaverMap);
+                }
+
+                if (markerArr.size() > 2) {
+                    nPolygon.setCoords(latLngArr);
+
+                    nPolygon.setColor(0x7f00ff00);
+                    nPolygon.setMap(mNaverMap);
+                }
+            }
+        });
+    }
+
+    //전체 오버레이 삭제
+    public void onMapRemoveOverlay(){
+        mButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d("myLog", "전체 오버레이 삭제");
+                for (int i = 0; i < markerArr.size(); i++) {
+                    markerArr.get(i).setMap(null);
+                }
+                markerArr.clear();
+                latLngArr.clear();
+                nPolygon.setMap(null);
+
+                for (int i = 0; i < markerLongArr.size(); i++) {
+                    markerLongArr.get(i).setMap(null);
+                }
+                markerLongArr.clear();
+                latLngLongArr.clear();
+            }
+        });
+    }
+
+    //카메라 좌표 이동
+    public void onMapMoveCamera(){
+        mCamera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d("myLog", "카메라 이동");
+                CameraUpdate cameraUpdate = CameraUpdate.scrollAndZoomTo(new LatLng(35.960259, 126.682631), 11).animate(CameraAnimation.Easing, 500);
+                mNaverMap.moveCamera(cameraUpdate);
+            }
+        });
+    }
+
+    //롱-클릭 마커 생성 후 정보창 표시
+    public void onMapLongClickMarker(){
+        mNaverMap.setOnMapLongClickListener(new NaverMap.OnMapLongClickListener() {
+            @Override
+            public void onMapLongClick(@NonNull @NotNull PointF pointF, @NonNull @NotNull LatLng latLng) {
+                //Toast.makeText(getApplicationContext(), "위도: " + latLng.latitude + ", 경도: " + latLng.longitude, Toast.LENGTH_SHORT).show();
+                markerLongArr.add(new Marker(new LatLng(latLng.latitude, latLng.longitude)));
+                latLngLongArr.add(new LatLng(latLng.latitude, latLng.longitude));
+
+                for (int i = 0; i < markerLongArr.size(); i++) {
+                    naverAddrApi = new NaverAddrApi();
+                    naverAddrApi.execute(latLngLongArr.get(i));
+
+                    markerLongArr.get(i).setMap(mNaverMap);
+                    infoWindow.open(markerLongArr.get(i));
+                }
+            }
+        });
+    }
+
+    //AsyncTask 롱-클릭 정보창에 주소 표시
     private class NaverAddrApi extends AsyncTask<LatLng, String, String> {
         String clientId = "fxcf963wbv";
         String clientSecret = "ufdFQhxxA073iiYX0dSmaN9cAzh3e8e3Z2y7dOKO";
