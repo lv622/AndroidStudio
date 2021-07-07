@@ -78,7 +78,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private Button mEnterButton;
     private EditText mEditText;
-    private String mText = "";
 
     private ArrayList<Marker> geoMarkerArr = new ArrayList<>();
     private ArrayList<LatLng> geoLatLngArr = new ArrayList<>();
