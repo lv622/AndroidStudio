@@ -1,5 +1,6 @@
 package com.example.myapplication;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.pm.ActivityInfo;
 import android.graphics.PointF;
@@ -13,6 +14,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -37,18 +39,25 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+    private String mClientId = "fxcf963wbv";
+    private String mClientSecret = "ufdFQhxxA073iiYX0dSmaN9cAzh3e8e3Z2y7dOKO";
+
     private Spinner mSpinner;
     private NaverMap mNaverMap;
     private CheckBox mLayerGroup;
     private Button mButton;
     private Button mCamera;
+
     private Marker mMarkerSchool = new Marker();
     private Marker mMarkerPort = new Marker();
     private Marker mMarkerCityHall = new Marker();
@@ -59,12 +68,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private ArrayList<Marker> markerLongArr = new ArrayList<>();
     private ArrayList<LatLng> latLngLongArr = new ArrayList<>();
     private PolygonOverlay nPolygon = new PolygonOverlay();
+    private int count = 0;
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
     private FusedLocationSource locationSource;
 
     private NaverAddrApi naverAddrApi;
     private InfoWindow infoWindow = new InfoWindow();
+
+    private Button mEnterButton;
+    private EditText mEditText;
+    private String mText = "";
+
+    private ArrayList<Marker> geoMarkerArr = new ArrayList<>();
+    private ArrayList<LatLng> geoLatLngArr = new ArrayList<>();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +110,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mLayerGroup = findViewById(R.id.checkBox);
         mButton = findViewById(R.id.remove);
         mCamera = findViewById(R.id.camera);
+        mEditText = findViewById(R.id.editTextTextPostalAddress);
+        mEnterButton = findViewById(R.id.eButton);
     }
 
     //위치 권한 설정하기
@@ -126,12 +146,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         onMapRemoveOverlay(); //전체 오버레이 삭제
         onMapMoveCamera(); //카메라 좌표 이동
         onMapLongClickMarker(); //롱-클릭 마커 생성 후 정보창 표시
+        threadAddr(); //주소 입력해서 마커 표시
     }
 
     //세 지점 마커, 폴리곤 표시
-    public void OnMapMP(){
+    public void OnMapMP() {
         //마커 표시
-        //Log.d("myLog", "학교, 항, 시청 마커 출력");
         mMarkerSchool.setPosition(new LatLng(35.946246, 126.682209));
         mMarkerPort.setPosition(new LatLng(35.967664, 126.736841));
         mMarkerCityHall.setPosition(new LatLng(35.970491, 126.617213));
@@ -140,7 +160,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMarkerCityHall.setMap(mNaverMap);
 
         //폴리곤 생성
-        //Log.d("myLog", "polygon 생성");
         PolygonOverlay polygon = new PolygonOverlay();
         polygon.setCoords(Arrays.asList(
                 new LatLng(35.946246, 126.682209),
@@ -154,7 +173,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //스피너 지도 유형 변경
-    public void onMapSpinner(){
+    public void onMapSpinner() {
         Log.d("myLog", "spinner 실행");
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -170,7 +189,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //체크박스 지적편집도 표시
-    public void onMapCheckBox(){
+    public void onMapCheckBox() {
         Log.d("myLog", "checkBox 실행");
         mLayerGroup.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -185,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //위경도 마커 표시
-    public void onMapLatLngMarker(){
+    public void onMapLatLngMarker() {
         Log.d("myLog", "위경도 좌표 표시, 새 마커 생성");
         mNaverMap.setOnMapClickListener(new NaverMap.OnMapClickListener() {
             @Override
@@ -210,7 +229,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //전체 오버레이 삭제
-    public void onMapRemoveOverlay(){
+    public void onMapRemoveOverlay() {
         mButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -227,12 +246,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
                 markerLongArr.clear();
                 latLngLongArr.clear();
+                count = 0;
             }
         });
     }
 
     //카메라 좌표 이동
-    public void onMapMoveCamera(){
+    public void onMapMoveCamera() {
         mCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -244,7 +264,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     //롱-클릭 마커 생성 후 정보창 표시
-    public void onMapLongClickMarker(){
+    public void onMapLongClickMarker() {
         mNaverMap.setOnMapLongClickListener(new NaverMap.OnMapLongClickListener() {
             @Override
             public void onMapLongClick(@NonNull @NotNull PointF pointF, @NonNull @NotNull LatLng latLng) {
@@ -252,22 +272,89 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 markerLongArr.add(new Marker(new LatLng(latLng.latitude, latLng.longitude)));
                 latLngLongArr.add(new LatLng(latLng.latitude, latLng.longitude));
 
-                for (int i = 0; i < markerLongArr.size(); i++) {
-                    naverAddrApi = new NaverAddrApi();
-                    naverAddrApi.execute(latLngLongArr.get(i));
+                naverAddrApi = new NaverAddrApi();
+                naverAddrApi.execute(latLngLongArr.get(count));
+                markerLongArr.get(count).setMap(mNaverMap);
+                infoWindow.open(markerLongArr.get(count));
+                count++;
+            }
+        });
+    }
 
-                    markerLongArr.get(i).setMap(mNaverMap);
-                    infoWindow.open(markerLongArr.get(i));
-                }
+    //주소 입력해서 마커 표시
+    public void threadAddr() {
+        mEnterButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        String text = mEditText.getText().toString();
+
+                        StringBuilder urlGeoBuilder = new StringBuilder("https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode?query=" + text);
+                        StringBuilder gsb = new StringBuilder();
+
+                        try {
+                            Log.d("Thread", "getPointFromNaver: 진행중");
+                            URL gURL = new URL(urlGeoBuilder.toString());
+                            HttpURLConnection cont = (HttpURLConnection) gURL.openConnection();
+
+                            cont.setRequestMethod("GET");
+                            cont.setRequestProperty("Content-Type", "application/json");
+                            cont.setRequestProperty("X-NCP-APIGW-API-KEY-ID", mClientId);
+                            cont.setRequestProperty("X-NCP-APIGW-API-KEY", mClientSecret);
+
+                            int responseCode = cont.getResponseCode();
+                            Log.d("Thread", "Thread response code:" + responseCode);
+
+                            BufferedReader tbr = null;
+                            if (responseCode == 200) { // 정상 호출
+                                tbr = new BufferedReader(new InputStreamReader(cont.getInputStream()));
+                            } else { // 에러 발생
+                                tbr = new BufferedReader(new InputStreamReader(cont.getInputStream()));
+                            }
+
+                            String line;
+                            while ((line = tbr.readLine()) != null) {
+                                gsb.append(line);
+                            }
+                            tbr.close();
+                            cont.disconnect();
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        JsonParser geoJsonParser = new JsonParser();
+
+                        JsonObject geoJsonObj = (JsonObject) geoJsonParser.parse(gsb.toString());
+                        JsonArray geoJsonArray = (JsonArray) geoJsonObj.get("addresses");
+                        geoJsonObj = (JsonObject) geoJsonArray.get(0);
+                        String geoPNU = "y: " + geoJsonObj.get("y").getAsString() + ", x: " + geoJsonObj.get("x").getAsString();
+
+                        Double geoLat = geoJsonObj.get("y").getAsDouble();
+                        Double geoLng = geoJsonObj.get("x").getAsDouble();
+
+                        Log.d("geotest", "run: " + geoPNU);
+                        Log.d("geotest", String.valueOf(geoJsonObj));
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                geoMarkerArr.add(new Marker());
+                                geoMarkerArr.get(0).setPosition(new LatLng(geoLat, geoLng));
+                                geoMarkerArr.get(0).setMap(mNaverMap);
+
+                            }
+                        });
+                    }
+                }).start();
             }
         });
     }
 
     //AsyncTask 롱-클릭 정보창에 주소 표시
     private class NaverAddrApi extends AsyncTask<LatLng, String, String> {
-        String clientId = "fxcf963wbv";
-        String clientSecret = "ufdFQhxxA073iiYX0dSmaN9cAzh3e8e3Z2y7dOKO";
-
         @Override
         protected String doInBackground(LatLng... latLngs) {
             String strCoord = String.valueOf(latLngs[0].longitude) + "," + String.valueOf(latLngs[0].latitude);
@@ -282,8 +369,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 conn.setRequestMethod("GET"); //요청 방식 선택 //헤더값
                 conn.setRequestProperty("Content-Type", "application/json"); //타입설정(application/json) 형식으로 전송 (Request Body 전달시 application/json로 서버에 전달.)
-                conn.setRequestProperty("X-NCP-APIGW-API-KEY-ID", clientId);
-                conn.setRequestProperty("X-NCP-APIGW-API-KEY", clientSecret);
+                conn.setRequestProperty("X-NCP-APIGW-API-KEY-ID", mClientId);
+                conn.setRequestProperty("X-NCP-APIGW-API-KEY", mClientSecret);
 
                 // request 코드가 200이면 정상적으로 호출
                 int responseCode = conn.getResponseCode();
@@ -319,12 +406,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             String pnu = getPnu(jsonStr);
 
             infoWindow.setAdapter(new InfoWindow.DefaultTextAdapter(getApplicationContext()) {
-            @NonNull
-            @Override
-            public CharSequence getText(@NonNull InfoWindow infoWindow) {
-                return pnu;
-            }
-        });
+                @NonNull
+                @Override
+                public CharSequence getText(@NonNull InfoWindow infoWindow) {
+                    return pnu;
+                }
+            });
         }
 
         private String getPnu(String jsonStr) {

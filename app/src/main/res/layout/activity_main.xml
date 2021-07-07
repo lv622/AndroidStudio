@@ -14,8 +14,8 @@
         app:navermap_latitude="35.946246"
         app:navermap_longitude="126.682209"
         app:navermap_zoom="12"
-        tools:layout_editor_absoluteX="16dp"
-        tools:layout_editor_absoluteY="16dp" />
+        tools:layout_editor_absoluteX="-45dp"
+        tools:layout_editor_absoluteY="0dp" />
 
     <Spinner
         android:id="@+id/spinner"
@@ -82,7 +82,19 @@
         android:ems="10"
         android:hint=" 주소를 입력하세요."
         android:inputType="textPostalAddress"
-        tools:layout_editor_absoluteX="55dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.03"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_editor_absoluteY="24dp" />
+
+    <Button
+        android:id="@+id/eButton"
+        android:layout_width="78dp"
+        android:layout_height="46dp"
+        android:text="Enter"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.28"
+        app:layout_constraintStart_toStartOf="parent"
         tools:layout_editor_absoluteY="24dp" />
 
 
